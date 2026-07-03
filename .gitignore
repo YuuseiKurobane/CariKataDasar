@@ -1,0 +1,22 @@
+node_modules/
+coverage/
+*.log
+
+# Generated parser data and reports.
+data/generated/*
+!data/generated/README.md
+data/frequency/*
+!data/frequency/README.md
+reports/*
+!reports/README.md
+
+# Machine-local corpus configuration and large resumable runs.
+tools/corpus/mc4-id/config.json
+tools/corpus/mc4-id/run-*/
+tools/corpus/mc4-id/__pycache__/
+tools/corpus/mc4-id/**/*.py[cod]
+
+# Temporary/atomic output files.
+*.tmp
+*.tmp-*
+

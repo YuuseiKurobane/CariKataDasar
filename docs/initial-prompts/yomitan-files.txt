@@ -1,0 +1,4 @@
+indonesian-transforms.js is our main file to tweak, copied from yomitan repo ext/js/language/id/indonesian-transforms.js
+
+yomitan-source-dontchange may contain other files from yomitan's engine such as ext/js/language/language-transformer.js
+if needed. copy the ones you need to this folder.

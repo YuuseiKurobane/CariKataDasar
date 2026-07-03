@@ -1,0 +1,14 @@
+TASK: write a script that does: 
+open C:\Users\admin\Documents\Codex\CariKataDasar\data\headwords\dictionaries
+combine them all to one file in C:\Users\admin\Documents\Codex\CariKataDasar\data\headwords
+headwords_combined.txt
+dedupe it
+
+read this file C:\Users\admin\Documents\Codex\CariKataDasar\data\frequency\naiveparse-mc4-id\run-v1\token_frequencies.csv.gz
+if you want context how this file was generated, check nearby scripts.
+the script that i want you to make accepts argument "threshold-minimum", default value is 100 if unspecified
+in the root of this folder, generate file unresolved_tokens.csv.
+filter out:
+- tokens that appear less than threshold-minimum times
+- tokens that appear in headwords_combined.txt
+this will be our main file to debug

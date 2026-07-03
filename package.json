@@ -1,0 +1,17 @@
+{
+  "name": "cari-kata-dasar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone Indonesian candidate-generation and parser-debugging harness for Yomitan.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build:headwords": "node scripts/build-headwords.mjs",
+    "check:upstream": "node scripts/check-upstream.mjs",
+    "test": "node --test"
+  },
+  "license": "GPL-3.0-or-later"
+}
+

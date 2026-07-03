@@ -1,0 +1,9 @@
+{
+  "checkpoint_every_lines": 100000,
+  "corpus_dir": "D:\\path\\to\\mc4-id-filter",
+  "expected_shards": 1024,
+  "log_every_lines": 25000,
+  "output_dir": "run-v1",
+  "workers": 6
+}
+
