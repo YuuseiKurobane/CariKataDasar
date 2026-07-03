@@ -1,0 +1,574 @@
+CariKataDasar project handoff
+==============================
+
+Last reconciled: 2026-07-04 (Asia/Bangkok)
+
+
+1. Project locations
+--------------------
+
+Standalone experiment repository:
+
+    C:\Users\admin\Documents\Codex\CariKataDasar
+
+Source Yomitan working tree used for the initial extraction:
+
+    C:\Users\admin\Documents\Codex\yomitan
+
+The standalone repository is the project to modify. The Yomitan working tree
+is reference/upstream material unless a later task explicitly asks to port
+changes back.
+
+
+2. User's goal and definition of failure
+----------------------------------------
+
+The user is developing Yomitan's Bahasa Indonesia parser/candidate generator.
+The central concern is not that the parser generates implausible or fake
+candidates. The important failures are:
+
+1. A real Indonesian headword is absent from the generated candidates.
+2. A real candidate exists but appears in a bad position.
+
+The main empirical debugging source should be real Indonesian text from the
+wild:
+
+1. Start with the mc4-id token frequency table.
+2. Discard tokens below a configurable occurrence threshold (default 100).
+3. Discard tokens already present exactly in the combined headword set.
+4. Run each remaining token through the Yomitan-compatible Indonesian
+   candidate generator.
+5. Find the first generated candidate that is a known headword.
+6. Produce a report exposing the complete unique candidate order.
+
+Community-reported difficult words are the second major regression source.
+
+
+3. Original requested report
+----------------------------
+
+The user's original proposed shape was:
+
+    token,resolution,num,word1,word2,word3,...
+
+Where:
+
+- token is the raw corpus token.
+- resolution is the first generated candidate found in the headword set.
+- num is the position of that candidate.
+- word1, word2, ... are candidates in Yomitan lookup order.
+
+The agreed/recommended expanded human-facing CSV is:
+
+    token,occurrences,resolution,resolution_rank,resolution_sources,candidate_count,word1,word2,...
+
+Important semantics:
+
+- word1 is the original raw token.
+- Rankings are over first-occurrence UNIQUE candidate strings.
+- Candidate order must never be alphabetically sorted.
+- resolution and resolution_rank should be blank when no candidate resolves.
+- occurrences must be retained so debugging can be prioritized.
+- resolution_sources records which input dictionaries contain the result.
+
+A compressed long-form JSONL candidate trace is also recommended as the
+machine-readable source of truth, since a dynamic wide CSV is awkward to
+stream and loses transform/preprocessor details.
+
+
+4. Repository and Git state
+---------------------------
+
+The repository has been initialized and committed.
+
+Current branch:
+
+    main
+
+Current HEAD observed during this handoff:
+
+    6c64ab1 add initial project files
+
+Before adding this handoff file, the tracked worktree was clean. Only expected
+ignored generated/local artifacts appeared in `git status --ignored`:
+
+- data/generated/headword_provenance.jsonl
+- data/generated/headwords_combined.txt
+- tools/corpus/mc4-id/config.json
+- tools/corpus/mc4-id/run-v1/
+- Python __pycache__ directories
+
+This handoff.txt may be the only new uncommitted file after this handoff.
+
+
+5. Current repository structure
+-------------------------------
+
+    CariKataDasar/
+    |-- README.md
+    |-- LICENSE
+    |-- UPSTREAM.md
+    |-- package.json
+    |-- package-lock.json
+    |-- .gitignore
+    |-- handoff.txt
+    |
+    |-- src/
+    |   |-- candidate-generator.js
+    |   |-- headword-index.js
+    |   |-- report-generator.js
+    |   `-- yomitan/
+    |       |-- core/
+    |       |   |-- event-dispatcher.js
+    |       |   |-- extension-error.js
+    |       |   `-- log.js
+    |       `-- language/
+    |           |-- language-transformer.js
+    |           |-- language-transforms.js
+    |           |-- text-processors.js
+    |           `-- id/
+    |               `-- indonesian-transforms.js
+    |
+    |-- scripts/
+    |   |-- build-headwords.mjs
+    |   `-- check-upstream.mjs
+    |
+    |-- tests/
+    |   |-- candidate-generator.test.js
+    |   |-- community-cases.test.js
+    |   |-- headword-index.test.js
+    |   `-- report-generator.test.js
+    |
+    |-- data/
+    |   |-- cases/
+    |   |   |-- README.md
+    |   |   `-- community.jsonl
+    |   |-- frequency/
+    |   |   `-- README.md
+    |   |-- generated/
+    |   |   `-- README.md
+    |   `-- headwords/
+    |       |-- SOURCES.md
+    |       `-- sources/
+    |           |-- acomprehensiveheadwords.txt
+    |           |-- all_entries_v6.1.0.txt
+    |           |-- indodicheadwords.txt
+    |           `-- wikitionaryheadwords.txt
+    |
+    |-- tools/
+    |   `-- corpus/
+    |       `-- mc4-id/
+    |           |-- raw_token_frequencies.py
+    |           |-- tokenizer.py
+    |           |-- io_utils.py
+    |           |-- intersect_kbbi.py
+    |           |-- config.example.json
+    |           |-- config.json                 (ignored, machine-local)
+    |           |-- README.md
+    |           |-- tests/
+    |           `-- run-v1/                     (ignored, large)
+    |
+    |-- reports/
+    |   `-- README.md
+    |
+    `-- docs/
+        `-- initial-prompts/
+            |-- data-pipeline.txt
+            `-- yomitan-files.txt
+
+
+6. Data already available
+-------------------------
+
+Completed frequency table:
+
+    tools/corpus/mc4-id/run-v1/token_frequencies.csv.gz
+
+Its header is:
+
+    token,occurrences
+
+The frequency table is deterministically sorted by:
+
+    occurrences descending, then token ascending
+
+This matters because an experiment runner can stop reading as soon as
+occurrences falls below the threshold.
+
+Observed corpus/run statistics:
+
+- 38,917,650 unique tokens
+- 7,385,932,584 total token occurrences
+- 1,024 input shards
+- compressed final frequency table is about 219 MB
+
+At threshold 100:
+
+- 649,184 tokens meet the threshold
+- 70,980 are exact members of the current headword union
+- 578,204 remain after exact filtering
+- 377,867 threshold-eligible tokens contain ASCII uppercase characters
+
+The uppercase count is why Yomitan-compatible preprocessing is essential.
+Calling `indonesianTransforms` directly on raw corpus tokens would incorrectly
+classify many ordinary case variants as parser failures.
+
+Headword sources:
+
+- acomprehensiveheadwords.txt: 91,188 exact lines
+- all_entries_v6.1.0.txt: 194,692 exact lines
+- indodicheadwords.txt: 43,423 exact lines
+- wikitionaryheadwords.txt: 60,682 exact lines
+
+Combined exact union:
+
+    276,540 headwords
+
+Generated files (ignored by Git):
+
+    data/generated/headwords_combined.txt
+    data/generated/headword_provenance.jsonl
+
+Do not lowercase, normalize, or trim headwords during index construction.
+Case and Unicode variants should be handled by the Yomitan preprocessing
+pipeline, and matches against the index should remain exact.
+
+
+7. Current implementation
+-------------------------
+
+src/candidate-generator.js
+
+- Creates a `LanguageTransformer` with the Indonesian descriptor.
+- Reproduces Indonesian's configured Yomitan preprocessing:
+  - decapitalize
+  - capitalize first letter
+  - remove alphabetic diacritics
+- Preserves Yomitan text-variant ordering.
+- Runs each variant through the transformer.
+- Deduplicates candidate text at first occurrence.
+- Returns rank, text, preprocessing chain, transform chain, and conditions.
+
+Candidate generation is breadth-first inside Yomitan's LanguageTransformer.
+Transform group order and rule order are therefore behavior and must not be
+changed casually.
+
+The transformer can generate empty strings and linguistically silly strings.
+This is currently accepted because the user's explicit priority is coverage
+and ordering of real candidates, not suppression of fake candidates.
+
+The harness intentionally processes one already-tokenized corpus token. It
+does not reproduce Yomitan's arbitrary substring/prefix scanning of a larger
+text selection. That omission is intentional for this experiment.
+
+
+src/headword-index.js
+
+- Reads every `.txt` file in `data/headwords/sources`, sorted by filename.
+- Builds an exact `Set` of headwords.
+- Builds a map from headword to every source filename containing it.
+- Preserves source provenance rather than collapsing all dictionaries into an
+  opaque union.
+
+
+src/report-generator.js
+
+- Resolves ONE token against a loaded headword index.
+- Selects the first matching unique candidate.
+- Produces an object with resolution rank and source dictionaries.
+- Can flatten that object into the proposed wide-report record.
+
+This is not yet a frequency-file runner.
+
+
+scripts/build-headwords.mjs
+
+- Builds the two generated headword artifacts atomically.
+- Already ran successfully and wrote 276,540 exact headwords.
+
+
+scripts/check-upstream.mjs
+
+- Verifies the pinned, non-editable Yomitan compatibility files by SHA-256.
+- Does not verify `indonesian-transforms.js` because that is intentionally the
+  main editable parser file.
+
+
+8. Yomitan source snapshot
+--------------------------
+
+The minimal runtime was copied from the Yomitan working tree at:
+
+    b8856e2517e8107a64718f57ea827f4558761565
+
+The copied `indonesian-transforms.js` initially matched upstream byte for byte:
+
+    SHA-256 596ba125c29ebdabf70d111c436385faec4a240e0708a7e8401fafe1cb0751d7
+
+UPSTREAM.md contains the complete vendored-file hash list.
+
+Required runtime files were intentionally limited to:
+
+- language/id/indonesian-transforms.js
+- language/language-transformer.js
+- language/language-transforms.js
+- language/text-processors.js
+- core/log.js and its two small dependencies
+
+Do not copy the full Translator, MultiLanguageTransformer, IndexedDB
+dictionary database, or every language merely to run this experiment.
+
+The copied Yomitan code is GPL-3.0-or-later. The repository includes the
+upstream license. Headword source licensing/provenance is not fully documented
+and remains a publication blocker; see data/headwords/SOURCES.md.
+
+
+9. Community regression cases
+-----------------------------
+
+The user supplied these initial cases:
+
+    berikan
+    diberikan
+    pemberian
+    mengunyah
+    menggali
+    mengali
+    menyapu
+    meraba
+    kebijaksanaanmulah
+    nenekkulah
+
+They are stored in:
+
+    data/cases/community.jsonl
+
+Expected coverage candidates currently encoded:
+
+- berikan -> beri
+- diberikan -> beri
+- pemberian -> beri
+- mengunyah -> kunyah
+- menggali -> gali
+- mengali -> kali
+- menyapu -> sapu
+- meraba -> raba
+- kebijaksanaanmulah -> bijaksana
+- nenekkulah -> nenek
+
+The trailing whitespace in the submitted `menyapu ` was treated as formatting
+and removed.
+
+The tests assert only that at least one expected real headword is generated.
+They do not reject extra candidates and do not yet assert ordering unless the
+user/community supplies an explicit ordering expectation.
+
+
+10. Last verified tests and commands
+------------------------------------
+
+From the repository root:
+
+    cd C:\Users\admin\Documents\Codex\CariKataDasar
+    npm run check:upstream
+    npm test
+    npm run build:headwords
+
+Last observed JavaScript result:
+
+    17 tests passed
+
+This includes all 10 community cases.
+
+Python corpus tests:
+
+    cd tools\corpus\mc4-id
+    py -m unittest discover -s tests -v
+
+Last observed Python result:
+
+    7 tests passed
+
+
+11. Critical missing work
+-------------------------
+
+The end-to-end experiment CLI does NOT exist yet.
+
+The user was told this explicitly. The intended command is:
+
+    npm run experiment -- --threshold-minimum 100
+
+But `package.json` currently has no `experiment` script and there is no
+`scripts/run-experiment.mjs`.
+
+This is the next priority.
+
+
+12. Recommended implementation for the experiment CLI
+------------------------------------------------------
+
+Add:
+
+    scripts/run-experiment.mjs
+
+Add to package.json:
+
+    "experiment": "node scripts/run-experiment.mjs"
+
+Recommended CLI options:
+
+    --threshold-minimum 100
+    --frequencies tools/corpus/mc4-id/run-v1/token_frequencies.csv.gz
+    --headwords data/headwords/sources
+    --output reports/debug.csv.gz
+    --trace-output reports/candidate-trace.jsonl.gz
+
+The default threshold should be 100 to match the user's original prompt.
+
+Required processing:
+
+1. Load the exact headword index once.
+2. Stream-decompress the frequency CSV; do not load 38.9 million rows into
+   memory.
+3. Validate the exact header `token,occurrences`.
+4. Because rows are frequency-sorted, stop when occurrences < threshold.
+5. Skip the token if it is already an exact headword.
+6. Generate unique ordered candidates using `IndonesianCandidateGenerator`.
+7. Resolve to the first candidate present in the exact headword set.
+8. Preserve the inherited frequency order in output.
+9. Emit run statistics:
+   - eligible token count
+   - exact-headword skips
+   - parser-resolved count
+   - parser-unresolved count
+   - occurrence-weighted equivalents
+   - resolution-rank histogram
+10. Write outputs atomically.
+
+CSV parsing must be real CSV parsing or carefully validated. Do not assume
+that splitting every line on commas is universally safe merely because the
+current tokenizer usually excludes commas.
+
+
+13. Wide CSV streaming decision
+-------------------------------
+
+The wide CSV has a dynamic number of `wordN` columns. A streaming writer does
+not know the maximum candidate count when writing the header.
+
+Reasonable solutions:
+
+A. Recommended:
+   - Stream each complete result to temporary JSONL.
+   - Track the maximum candidate count.
+   - Perform a second pass to write the final wide CSV header and rows.
+   - Optionally keep a compressed detailed JSONL trace.
+
+B. Accept a `--max-candidates` report width and put full traces in JSONL.
+
+C. Use only normalized long-form CSV:
+
+       token,occurrences,candidate_rank,candidate,is_headword,sources,...
+
+   This is easier to stream but does not exactly match the user's requested
+   spreadsheet.
+
+Do not buffer all 578,204 result objects in RAM merely to discover the widest
+row.
+
+
+14. Tests still needed for the CLI
+----------------------------------
+
+Add small fixture-based tests covering:
+
+- plain and `.gz` frequency input
+- threshold default and override
+- early stop at the first below-threshold row
+- exact-headword exclusion
+- parser resolution
+- unresolved token output
+- first unique candidate ranking
+- capitalization preprocessing
+- provenance in `resolution_sources`
+- deterministic output
+- valid quoting for commas, quotes, Unicode, and newlines where relevant
+- atomic output behavior
+- malformed header/count rejection
+- wide header matching the maximum candidate count
+
+Tests must use tiny temporary files, never the real 219 MB table.
+
+
+15. Later improvements, not prerequisites for the first run
+------------------------------------------------------------
+
+Context extraction:
+
+The frequency table contains token and count only. It discarded surrounding
+sentences. A high-frequency unresolved token may be Indonesian, a proper name,
+another language, boilerplate, or web debris.
+
+After the first report exists, add a second-pass context extractor for a
+selected set of high-priority unresolved tokens. It should rescan mc4-id and
+retain a few representative sentences (and URL if available) per target.
+Do not rerun or redesign the frequency count merely to get context.
+
+Diff reports:
+
+For parser iteration, compare old and new runs:
+
+- newly resolved real tokens
+- newly missing tokens
+- resolution rank improved/worsened
+- occurrence-weighted coverage change
+
+This is more useful than looking only at total candidate count.
+
+Community ordering:
+
+Extend community JSONL with explicit fields such as `expected_first`,
+`must_precede`, or a maximum acceptable rank only when the desired ordering is
+known. Keep simple coverage assertions separate from ordering assertions.
+
+
+16. Important cautions for the next agent
+-----------------------------------------
+
+- Preserve user data and the completed run-v1 directory.
+- Do not commit the 219 MB frequency table, checkpoints, SQLite merge data, or
+  generated headword indexes.
+- Do not normalize the source frequency table or headword union silently.
+- Do not sort generated candidates.
+- Do not rank duplicate candidate strings more than once.
+- Do not treat extra fake candidates as regression failures.
+- Do not remove case/diacritic preprocessing.
+- Keep dictionary provenance.
+- Keep corpus generation (Python) separate from parser analysis (Node).
+- Review existing dirty changes before editing; this handoff itself may be
+  uncommitted.
+- Use `git -c safe.directory=C:/Users/admin/Documents/Codex/CariKataDasar`
+  if Git reports dubious ownership in the sandbox.
+
+
+17. Concise next-agent objective
+--------------------------------
+
+Implement and test the streaming `npm run experiment` command so this works:
+
+    cd C:\Users\admin\Documents\Codex\CariKataDasar
+    npm run build:headwords
+    npm run experiment -- --threshold-minimum 100
+
+Expected primary output:
+
+    reports/debug.csv.gz
+
+Expected optional/canonical trace:
+
+    reports/candidate-trace.jsonl.gz
+
+Then run the full JavaScript and Python test suites and report the output row
+counts and resolution summary. Do not tweak Indonesian morphology rules merely
+to make the first corpus report look better; establish the baseline first.
