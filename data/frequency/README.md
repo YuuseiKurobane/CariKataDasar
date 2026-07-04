@@ -4,15 +4,17 @@ The raw deterministic mc4-id count is kept with its resumable run artifacts at:
 
 `mc4-id-naive-frequency/run-v1/token_frequencies.csv.gz`
 
-The project-facing preprocessing step is:
+The project-facing preprocessing command is:
 
-`scripts/prepare-debug-frequencies.py`
+`npm run prepare:frequencies`
 
-It writes the cleaned frequency table to:
+It runs `scripts/prepare-debug-frequencies.py` to write the complete cleaned
+frequency table to:
 
 `data/frequency/cleaned_token_frequencies.csv.gz`
 
-It also materializes:
+It then runs `scripts/prepare-review-cases.mjs` to discard lowercased tokens
+that exactly match a configured headword and materialize:
 
 - `data/review/corpus-review-seed.csv`
 - `data/review/batches/corpus-review-*.csv`

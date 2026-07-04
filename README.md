@@ -57,6 +57,11 @@ letter and aggregated occurrences greater than 100, then writes:
 - ...
 - `data/review/batches/corpus-review-90-100k.csv`
 
+The cleaned frequency table retains every token that passes those corpus
+filters. The review CSVs exclude only lowercased surface forms that exactly
+match a configured headword. Transform-derived candidates are not used for
+this filtering.
+
 The generated review CSVs use exactly these columns:
 
 `token,occurrences,expected_result,is_interesting`

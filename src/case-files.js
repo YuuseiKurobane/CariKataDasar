@@ -1,12 +1,16 @@
 import {readFile, rename, writeFile} from 'node:fs/promises';
+import {promisify} from 'node:util';
+import {gunzip} from 'node:zlib';
 
 const REGRESSION_CASE_HEADER = ['token', 'expected_result'];
+const FREQUENCY_HEADER = ['token', 'occurrences'];
 const REVIEW_BATCH_HEADER = [
     'token',
     'occurrences',
     'expected_result',
     'is_interesting',
 ];
+const gunzipAsync = promisify(gunzip);
 
 function parseCsv(text) {
     const rows = [];
@@ -109,7 +113,10 @@ function serializeCsv(header, records) {
 }
 
 async function loadCsvObjects(filePath, expectedHeader) {
-    const text = await readFile(filePath, 'utf8');
+    const contents = await readFile(filePath);
+    const text = filePath.endsWith('.gz')
+        ? (await gunzipAsync(contents)).toString('utf8')
+        : contents.toString('utf8');
     const rows = parseCsv(text);
     if (rows.length === 0) {
         throw new Error(`Empty CSV file: ${filePath}`);
@@ -129,10 +136,18 @@ export async function loadRegressionCaseCsv(filePath) {
     return loadCsvObjects(filePath, REGRESSION_CASE_HEADER);
 }
 
+export async function loadFrequencyCsv(filePath) {
+    return loadCsvObjects(filePath, FREQUENCY_HEADER);
+}
+
 export async function loadReviewBatchCsv(filePath) {
     return loadCsvObjects(filePath, REVIEW_BATCH_HEADER);
 }
 
 export async function writeRegressionCaseCsv(filePath, records) {
     await writeCsvAtomic(filePath, REGRESSION_CASE_HEADER, records);
+}
+
+export async function writeReviewBatchCsv(filePath, records) {
+    await writeCsvAtomic(filePath, REVIEW_BATCH_HEADER, records);
 }

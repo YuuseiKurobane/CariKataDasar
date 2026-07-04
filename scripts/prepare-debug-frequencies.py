@@ -20,17 +20,8 @@ RAW_FREQUENCY_PATH = (
 CLEANED_FREQUENCY_PATH = (
     REPOSITORY_ROOT / "data" / "frequency" / "cleaned_token_frequencies.csv.gz"
 )
-REVIEW_ROOT = REPOSITORY_ROOT / "data" / "review"
-REVIEW_SEED_PATH = REVIEW_ROOT / "corpus-review-seed.csv"
-REVIEW_BATCH_DIRECTORY = REVIEW_ROOT / "batches"
-REVIEW_LABELED_DIRECTORY = REVIEW_ROOT / "labeled"
 
 MINIMUM_OCCURRENCES = 100
-MEDIUM_MINIMUM_TOKEN_LENGTH = 8
-LONG_MINIMUM_TOKEN_LENGTH = 13
-SEED_ROWS_PER_GROUP = 100
-BATCH_SIZE = 10_000
-MAX_BATCH_COUNT = 10
 MAX_CHUNK_KEYS = 500_000
 
 ASCII_LOWERCASE_RE = re.compile(r"[a-z]")
@@ -185,66 +176,6 @@ def build_cleaned_rows(raw_path: Path) -> list[tuple[str, int]]:
     return cleaned_rows
 
 
-def build_seed_rows(cleaned_rows: list[tuple[str, int]]) -> list[tuple[str, int, str, str]]:
-    top_rows = cleaned_rows[:SEED_ROWS_PER_GROUP]
-    medium_rows = [
-        row
-        for row in cleaned_rows
-        if len(row[0]) >= MEDIUM_MINIMUM_TOKEN_LENGTH
-    ][:SEED_ROWS_PER_GROUP]
-    long_rows = [
-        row
-        for row in cleaned_rows
-        if len(row[0]) >= LONG_MINIMUM_TOKEN_LENGTH
-    ][:SEED_ROWS_PER_GROUP]
-
-    if (
-        len(top_rows) < SEED_ROWS_PER_GROUP
-        or len(medium_rows) < SEED_ROWS_PER_GROUP
-        or len(long_rows) < SEED_ROWS_PER_GROUP
-    ):
-        raise ValueError("Not enough cleaned rows to build the 300-row review seed")
-
-    return [
-        (token, occurrences, "", "")
-        for token, occurrences in [*top_rows, *medium_rows, *long_rows]
-    ]
-
-
-def write_review_outputs(cleaned_rows: list[tuple[str, int]]) -> None:
-    REVIEW_ROOT.mkdir(parents=True, exist_ok=True)
-    REVIEW_BATCH_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    REVIEW_LABELED_DIRECTORY.mkdir(parents=True, exist_ok=True)
-
-    atomic_write_csv(
-        REVIEW_SEED_PATH,
-        ("token", "occurrences", "expected_result", "is_interesting"),
-        build_seed_rows(cleaned_rows),
-    )
-
-    for existing_path in REVIEW_BATCH_DIRECTORY.glob("corpus-review-*.csv"):
-        existing_path.unlink()
-
-    for batch_index in range(MAX_BATCH_COUNT):
-        start = batch_index * BATCH_SIZE
-        if start >= len(cleaned_rows):
-            break
-
-        end = min(start + BATCH_SIZE, len(cleaned_rows))
-        file_name = (
-            f"corpus-review-{start // 1000}-{(start + BATCH_SIZE) // 1000}k.csv"
-        )
-        batch_rows = [
-            (token, occurrences, "", "")
-            for token, occurrences in cleaned_rows[start:end]
-        ]
-        atomic_write_csv(
-            REVIEW_BATCH_DIRECTORY / file_name,
-            ("token", "occurrences", "expected_result", "is_interesting"),
-            batch_rows,
-        )
-
-
 def main() -> int:
     cleaned_rows = build_cleaned_rows(RAW_FREQUENCY_PATH)
 
@@ -253,19 +184,12 @@ def main() -> int:
         ("token", "occurrences"),
         cleaned_rows,
     )
-    write_review_outputs(cleaned_rows)
 
-    generated_batch_count = min(
-        MAX_BATCH_COUNT,
-        (len(cleaned_rows) + BATCH_SIZE - 1) // BATCH_SIZE,
-    )
     print(
         "Prepared "
         f"{len(cleaned_rows):,} cleaned tokens from "
         f"{RAW_FREQUENCY_PATH.relative_to(REPOSITORY_ROOT)}; wrote "
-        f"{CLEANED_FREQUENCY_PATH.relative_to(REPOSITORY_ROOT)}, "
-        f"{REVIEW_SEED_PATH.relative_to(REPOSITORY_ROOT)}, and "
-        f"{generated_batch_count} review batch file(s)."
+        f"{CLEANED_FREQUENCY_PATH.relative_to(REPOSITORY_ROOT)}."
     )
     return 0
 
