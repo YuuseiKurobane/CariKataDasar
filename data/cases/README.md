@@ -1,15 +1,19 @@
 # Regression cases
 
-Community reports and manually confirmed difficult cases belong here as
-JSON Lines. Recommended fields:
+There are two project-facing regression inputs:
 
-```json
-{"token":"example","expected_any":["headword"],"expected_first":"headword","source":"issue-or-url","notes":""}
-```
+1. `community-dump.txt`: newline-separated raw community submissions.
+2. `community.csv`: machine-facing community regression cases with exactly
+   `token,expected_result`.
 
-Coverage and ordering assertions should be separate: a case can require that
-a real headword appears without asserting that no extra candidates exist.
+Curated corpus regression cases are generated, not edited manually:
 
-`community.jsonl` contains the active community-derived coverage suite. The
-Node test suite loads it directly, so adding a case immediately creates a
-regression test.
+1. Blank review batches are generated under `data/review/batches/`.
+2. Human or LLM-labeled copies belong under `data/review/labeled/`.
+3. `npm run materialize:cases` reads every existing
+   `data/review/labeled/corpus-review-*.csv`.
+4. Rows marked `is_interesting=y` with a non-empty `expected_result` become
+   `corpus-curated.csv`.
+
+`npm test` loads both `community.csv` and `corpus-curated.csv` and checks only
+that each expected real headword appears among the generated candidates.

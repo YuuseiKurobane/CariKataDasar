@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import gzip
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from io_utils import iter_count_csv
 from raw_token_frequencies import (

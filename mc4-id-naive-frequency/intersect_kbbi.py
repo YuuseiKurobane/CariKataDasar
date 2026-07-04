@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dictionary-dir",
         type=Path,
-        default=Path(__file__).resolve().parent.parent / "4plus",
+        default=Path(__file__).resolve().parent.parent / "tools" / "corpus" / "4plus",
         help="Unpacked Yomitan dictionary directory",
     )
     parser.add_argument(

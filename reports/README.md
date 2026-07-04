@@ -1,13 +1,7 @@
 # Reports
 
-Generated CSV and JSONL reports belong here and are ignored by Git.
+The core iterative workflow now writes review queues under `data/review/` and
+regression suites under `data/cases/`.
 
-The intended wide CSV begins with:
-
-```text
-token,occurrences,resolution,resolution_rank,resolution_sources,candidate_count,word1,word2,...
-```
-
-Candidate ranks refer to first-occurrence unique candidates in Yomitan query
-order.
-
+Use this directory only for optional ad hoc reports that are outside the main
+prepare -> label -> materialize -> test loop. Reports remain ignored by Git.

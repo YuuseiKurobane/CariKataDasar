@@ -11,12 +11,11 @@ reports/*
 !reports/README.md
 
 # Machine-local corpus configuration and large resumable runs.
-tools/corpus/mc4-id/config.json
-tools/corpus/mc4-id/run-*/
-tools/corpus/mc4-id/__pycache__/
-tools/corpus/mc4-id/**/*.py[cod]
+mc4-id-naive-frequency/config.json
+mc4-id-naive-frequency/run-*/
+mc4-id-naive-frequency/__pycache__/
+mc4-id-naive-frequency/**/*.py[cod]
 
 # Temporary/atomic output files.
 *.tmp
 *.tmp-*
-

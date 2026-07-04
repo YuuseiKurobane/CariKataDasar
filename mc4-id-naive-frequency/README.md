@@ -11,6 +11,10 @@ It does not load KBBI while counting, call CariKataDasar, normalize, stem,
 case-fold, remove digits, or use any legacy map/cache. The final file is sorted
 by occurrence count descending and exact token ascending.
 
+CariKataDasar's project-facing review loop consumes
+`run-v1/token_frequencies.csv.gz` through
+`..\scripts\prepare-debug-frequencies.py`.
+
 ## Token boundary policy (version 1)
 
 A token:
@@ -93,6 +97,6 @@ py intersect_kbbi.py run-v1\token_frequencies.csv.gz `
 ```
 
 This command loads only `term_bank_1.json` through `term_bank_99.json` from
-`..\4plus`, excluding legacy redirect banks 100–125. It requires exactly
-112,647 unique clean headwords and performs an exact, case-sensitive
-intersection without normalization.
+`tools\corpus\4plus` by default, excluding legacy redirect banks 100-125. It
+requires exactly 112,647 unique clean headwords and performs an exact,
+case-sensitive intersection without normalization.
