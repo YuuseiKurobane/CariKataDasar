@@ -9,7 +9,7 @@ import {loadRegressionCaseCsv} from '../src/case-files.js';
 test('materializer merges arbitrary CSV dumps and deduplicates case pairs', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'cari-kata-dasar-'));
     const caseDumpDirectoryPath = path.join(directory, 'case-dumps');
-    const outputFilePath = path.join(directory, 'cases', 'regression.csv');
+    const outputFilePath = path.join(directory, 'cases', '_combined.csv');
 
     try {
         await mkdir(caseDumpDirectoryPath);
@@ -62,7 +62,7 @@ test('materializer merges arbitrary CSV dumps and deduplicates case pairs', asyn
 test('materializer writes a header-only CSV when no cases qualify', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'cari-kata-dasar-'));
     const caseDumpDirectoryPath = path.join(directory, 'case-dumps');
-    const outputFilePath = path.join(directory, 'cases', 'regression.csv');
+    const outputFilePath = path.join(directory, 'cases', '_combined.csv');
 
     try {
         await mkdir(caseDumpDirectoryPath);

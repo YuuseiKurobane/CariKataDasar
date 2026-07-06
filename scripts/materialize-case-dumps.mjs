@@ -8,7 +8,7 @@ import {
 
 const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const caseDumpDirectory = path.join(repositoryRoot, 'data', 'case-dumps');
-const outputPath = path.join(repositoryRoot, 'data', 'cases', 'regression.csv');
+const outputPath = path.join(repositoryRoot, 'data', 'cases', '_combined.csv');
 
 function isCaseDumpFile(name) {
     return /\.csv$/iu.test(name);

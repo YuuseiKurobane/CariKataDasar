@@ -11,8 +11,8 @@
     "build:headwords": "node scripts/build-headwords.mjs",
     "check:upstream": "node scripts/check-upstream.mjs",
     "prepare:frequencies": "py scripts/prepare-debug-frequencies.py && node scripts/prepare-review-cases.mjs",
-    "materialize:cases": "node scripts/materialize-case-dumps.mjs",
-    "test": "npm run materialize:cases && node --test"
+    "pretest": "node scripts/materialize-case-dumps.mjs",
+    "test": "node --test"
   },
   "license": "GPL-3.0-or-later"
 }

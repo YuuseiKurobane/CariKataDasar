@@ -5,12 +5,9 @@ generator. Its main job is to turn real corpus tokens and manually or
 LLM-discovered inconsistencies into regression cases that expose missing
 headwords and candidate-order problems.
 
-The project deliberately treats two questions separately:
-
-1. Did the parser generate a real candidate?
-2. If it did, how early did that candidate appear?
-
-Generating implausible extra candidates is not itself considered a failure.
+Regression cases test which generated candidate resolves first against the
+current CKD headword set. An extra candidate is a failure when it is a
+headword and resolves before the expected result.
 
 ## Requirements
 
@@ -26,7 +23,6 @@ No npm dependencies are required for the current harness.
 npm run check:upstream
 npm run build:headwords
 npm run prepare:frequencies
-npm run materialize:cases
 npm test
 ```
 
@@ -68,19 +64,20 @@ The generated review CSVs use exactly these columns:
 
 Blank generated review batches stay in `data/review/batches/`. Human or
 LLM review happens in copies with descriptive filenames under
-`data/case-dumps/`, such as `try1_0-10k.csv`. A dump only needs the `token` and
-`expected_result` columns, so review-only columns can be removed or left in
-place.
+`data/case-dumps/`, such as `initial_prompt.csv`, `manual_2026-07-06.csv`, or
+`corpus_review_0-10k.csv`. A dump only needs the `token` and `expected_result`
+columns, so review-only columns can be removed or left in place.
 
 After labeling, run:
 
 ```powershell
-npm run materialize:cases
+npm test
 ```
 
-That command reads every CSV file in `data/case-dumps/` and generates:
+Before running the tests, that command reads every CSV file in
+`data/case-dumps/` and generates:
 
-`data/cases/regression.csv`
+`data/cases/_combined.csv`
 
 The original 10k review batches remain unchanged as reusable review input.
 
@@ -100,12 +97,15 @@ Optional columns such as `enabled`, `notes`, `occurrences`, or
 by default; set `enabled` to `false`, `no`, `n`, `off`, `0`, or `disabled` to
 skip one. Empty rows and rows missing either required value are ignored.
 
-`npm run materialize:cases` scans all `data/case-dumps/*.csv`, deduplicates
-identical `token`/`expected_result` pairs, and writes the generated regression
-suite to `data/cases/regression.csv`.
+`npm test` scans all `data/case-dumps/*.csv`, deduplicates identical
+`token`/`expected_result` pairs, and writes the generated regression suite to
+`data/cases/_combined.csv` before running the tests.
 
-`npm test` rematerializes that file first, then asserts that every expected
-real headword appears somewhere in the generated candidate list.
+For each case, `expected_result` is the first generated candidate that resolves
+against the current CKD headword set. A case fails if no candidate resolves or
+if a different candidate resolves first. If the token itself is already a
+headword and `expected_result` equals the token, the test warns that the case is
+probably redundant but does not fail for that reason.
 
 ## Repository layout
 
