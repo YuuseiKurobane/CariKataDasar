@@ -1,9 +1,9 @@
 # CariKataDasar
 
 CariKataDasar is a standalone test harness for Yomitan's Indonesian candidate
-generator. Its main job is to turn real corpus tokens and community reports
-into small regression suites that expose missing headwords and candidate-order
-problems.
+generator. Its main job is to turn real corpus tokens and manually or
+LLM-discovered inconsistencies into regression cases that expose missing
+headwords and candidate-order problems.
 
 The project deliberately treats two questions separately:
 
@@ -67,7 +67,10 @@ The generated review CSVs use exactly these columns:
 `token,occurrences,expected_result,is_interesting`
 
 Blank generated review batches stay in `data/review/batches/`. Human or
-LLM-labeled copies belong in `data/review/labeled/` with the same filenames.
+LLM review happens in copies with descriptive filenames under
+`data/case-dumps/`, such as `try1_0-10k.csv`. A dump only needs the `token` and
+`expected_result` columns, so review-only columns can be removed or left in
+place.
 
 After labeling, run:
 
@@ -75,31 +78,34 @@ After labeling, run:
 npm run materialize:cases
 ```
 
-That command reads every existing `data/review/labeled/corpus-review-*.csv`
-file and generates:
+That command reads every CSV file in `data/case-dumps/` and generates:
 
-`data/cases/corpus-curated.csv`
+`data/cases/regression.csv`
 
-Only rows marked `is_interesting=y` with a non-empty `expected_result` become
-regression cases.
+The original 10k review batches remain unchanged as reusable review input.
 
-## Community workflow
+## Case dump workflow
 
-Raw community submissions belong in:
+Keep each manually or LLM-discovered group in a small, descriptively named
+file under:
 
-`data/cases/community-dump.txt`
+`data/case-dumps/`
 
-The machine-facing regression suite belongs in:
-
-`data/cases/community.csv`
-
-Its columns are:
+Each CSV requires these columns, in either order:
 
 `token,expected_result`
 
-`npm test` loads both `community.csv` and `corpus-curated.csv` and asserts only
-that each expected real headword appears somewhere in the generated candidate
-list.
+Optional columns such as `enabled`, `notes`, `occurrences`, or
+`is_interesting` are allowed. Unknown columns are ignored. Rows are included
+by default; set `enabled` to `false`, `no`, `n`, `off`, `0`, or `disabled` to
+skip one. Empty rows and rows missing either required value are ignored.
+
+`npm run materialize:cases` scans all `data/case-dumps/*.csv`, deduplicates
+identical `token`/`expected_result` pairs, and writes the generated regression
+suite to `data/cases/regression.csv`.
+
+`npm test` rematerializes that file first, then asserts that every expected
+real headword appears somewhere in the generated candidate list.
 
 ## Repository layout
 
@@ -111,8 +117,9 @@ list.
 - `src/report-generator.js`: resolves tokens against the candidate sequence.
 - `src/case-files.js`: CSV loaders and writers for regression-case files.
 - `data/headwords/sources/`: raw headword lists.
-- `data/review/`: generated review queues and labeled review batches.
-- `data/cases/`: community and curated regression cases.
+- `data/review/`: generated review queues and 10k review-input batches.
+- `data/case-dumps/`: source-specific accepted case dumps.
+- `data/cases/`: generated merged regression cases.
 - `mc4-id-naive-frequency/`: the deterministic raw corpus counter.
 - `reports/`: optional ad hoc outputs outside the core review loop.
 

@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+    loadCaseDumpCsv,
     loadRegressionCaseCsv,
     loadReviewBatchCsv,
 } from '../src/case-files.js';
@@ -39,6 +40,47 @@ test('regression case CSV requires exact column order', async () => {
         await assert.rejects(
             loadRegressionCaseCsv(filePath),
             /expected token,expected_result/u,
+        );
+    });
+});
+
+test('case dump CSV requires token and expected_result in any column order', async () => {
+    await withTemporaryCsv(
+        'notes,expected_result,token,enabled,unknown\n'
+            + 'keep,makan,makanan,,ignored\n'
+            + 'keep,tulis,tulisan,yes,ignored\n',
+        async (filePath) => {
+            assert.deepEqual(await loadCaseDumpCsv(filePath), [
+                {token: 'makanan', expected_result: 'makan'},
+                {token: 'tulisan', expected_result: 'tulis'},
+            ]);
+        },
+    );
+});
+
+test('case dump CSV ignores empty, incomplete, and disabled rows', async () => {
+    await withTemporaryCsv(
+        'token,expected_result,enabled,notes\n'
+            + '\n'
+            + ',,,\n'
+            + 'berkata,,true,\n'
+            + ',kata,true,\n'
+            + 'abaikan,abai,false,\n'
+            + 'abaikan-juga,abai, OFF ,\n'
+            + 'kiriman,kirim\n',
+        async (filePath) => {
+            assert.deepEqual(await loadCaseDumpCsv(filePath), [
+                {token: 'kiriman', expected_result: 'kirim'},
+            ]);
+        },
+    );
+});
+
+test('case dump CSV rejects a missing required column', async () => {
+    await withTemporaryCsv('token,notes\nkata,missing expected result\n', async (filePath) => {
+        await assert.rejects(
+            loadCaseDumpCsv(filePath),
+            /exactly one expected_result column/u,
         );
     });
 });

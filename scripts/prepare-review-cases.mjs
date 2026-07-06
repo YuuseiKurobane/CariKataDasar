@@ -23,7 +23,6 @@ const headwordSourceDirectory = path.join(
 const reviewRoot = path.join(repositoryRoot, 'data', 'review');
 const reviewSeedPath = path.join(reviewRoot, 'corpus-review-seed.csv');
 const reviewBatchDirectory = path.join(reviewRoot, 'batches');
-const reviewLabeledDirectory = path.join(reviewRoot, 'labeled');
 
 const MEDIUM_MINIMUM_TOKEN_LENGTH = 8;
 const LONG_MINIMUM_TOKEN_LENGTH = 13;
@@ -107,11 +106,9 @@ export async function writeReviewOutputs(
     {
         seedPath = reviewSeedPath,
         batchDirectory = reviewBatchDirectory,
-        labeledDirectory = reviewLabeledDirectory,
     } = {},
 ) {
     await mkdir(batchDirectory, {recursive: true});
-    await mkdir(labeledDirectory, {recursive: true});
     await removeExistingReviewBatches(batchDirectory);
 
     await writeReviewBatchCsv(

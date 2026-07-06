@@ -3,6 +3,7 @@ import {promisify} from 'node:util';
 import {gunzip} from 'node:zlib';
 
 const REGRESSION_CASE_HEADER = ['token', 'expected_result'];
+const REQUIRED_CASE_DUMP_COLUMNS = ['token', 'expected_result'];
 const FREQUENCY_HEADER = ['token', 'occurrences'];
 const REVIEW_BATCH_HEADER = [
     'token',
@@ -10,6 +11,7 @@ const REVIEW_BATCH_HEADER = [
     'expected_result',
     'is_interesting',
 ];
+const DISABLED_VALUES = new Set(['0', 'disabled', 'false', 'n', 'no', 'off']);
 const gunzipAsync = promisify(gunzip);
 
 function parseCsv(text) {
@@ -85,6 +87,19 @@ function assertHeader(actualHeader, expectedHeader, filePath) {
     }
 }
 
+function assertCaseDumpHeader(header, filePath) {
+    for (const requiredColumn of REQUIRED_CASE_DUMP_COLUMNS) {
+        const occurrenceCount = header.filter(
+            (column) => column === requiredColumn,
+        ).length;
+        if (occurrenceCount !== 1) {
+            throw new Error(
+                `${filePath} must contain exactly one ${requiredColumn} column`,
+            );
+        }
+    }
+}
+
 function rowsToObjects(rows, header, filePath) {
     return rows.map((row, index) => {
         if (row.length !== header.length) {
@@ -94,6 +109,42 @@ function rowsToObjects(rows, header, filePath) {
         }
         return Object.fromEntries(header.map((column, columnIndex) => [column, row[columnIndex]]));
     });
+}
+
+function rowsToCaseDumpRecords(rows, header, filePath) {
+    const tokenIndex = header.indexOf('token');
+    const expectedResultIndex = header.indexOf('expected_result');
+    const enabledIndex = header.indexOf('enabled');
+    const records = [];
+
+    for (const [index, row] of rows.entries()) {
+        if (row.every((value) => value.trim().length === 0)) {
+            continue;
+        }
+        if (row.length > header.length) {
+            throw new Error(
+                `${filePath}:${index + 2}: expected at most ${header.length} columns, got ${row.length}`,
+            );
+        }
+
+        const token = (row[tokenIndex] ?? '').trim();
+        const expectedResult = (row[expectedResultIndex] ?? '').trim();
+        const enabled = (row[enabledIndex] ?? '').trim().toLowerCase();
+        if (
+            token.length === 0
+            || expectedResult.length === 0
+            || DISABLED_VALUES.has(enabled)
+        ) {
+            continue;
+        }
+
+        records.push({
+            token,
+            expected_result: expectedResult,
+        });
+    }
+
+    return records;
 }
 
 function escapeCsvField(value) {
@@ -124,6 +175,18 @@ async function loadCsvObjects(filePath, expectedHeader) {
     const [header, ...bodyRows] = rows;
     assertHeader(header, expectedHeader, filePath);
     return rowsToObjects(bodyRows, expectedHeader, filePath);
+}
+
+export async function loadCaseDumpCsv(filePath) {
+    const contents = await readFile(filePath, 'utf8');
+    const rows = parseCsv(contents);
+    if (rows.length === 0) {
+        throw new Error(`Empty CSV file: ${filePath}`);
+    }
+
+    const [header, ...bodyRows] = rows;
+    assertCaseDumpHeader(header, filePath);
+    return rowsToCaseDumpRecords(bodyRows, header, filePath);
 }
 
 async function writeCsvAtomic(filePath, header, records) {
