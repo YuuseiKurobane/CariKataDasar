@@ -2,16 +2,16 @@ import {mkdir, readdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
-    loadCaseDumpCsv,
-    writeRegressionCaseCsv,
+    loadParserCaseFile,
+    writeParserCaseFile,
 } from '../src/case-files.js';
 
 const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const caseDumpDirectory = path.join(repositoryRoot, 'data', 'case-dumps');
-const outputPath = path.join(repositoryRoot, 'data', 'cases', '_combined.csv');
+const outputPath = path.join(repositoryRoot, 'data', 'cases', '_combined.txt');
 
 function isCaseDumpFile(name) {
-    return /\.csv$/iu.test(name);
+    return /\.txt$/iu.test(name);
 }
 
 async function getCaseDumpFiles(directoryPath) {
@@ -38,29 +38,29 @@ export async function materializeCaseDumps({
     await mkdir(path.dirname(outputFilePath), {recursive: true});
 
     const fileNames = await getCaseDumpFiles(caseDumpDirectoryPath);
-    const regressionCases = [];
+    const parserCases = [];
     const seenCases = new Set();
     let duplicateCount = 0;
 
     for (const fileName of fileNames) {
-        const rows = await loadCaseDumpCsv(
+        const rows = await loadParserCaseFile(
             path.join(caseDumpDirectoryPath, fileName),
         );
         for (const row of rows) {
-            const key = JSON.stringify([row.token, row.expected_result]);
+            const key = JSON.stringify([row.token, ...row.hits]);
             if (seenCases.has(key)) {
                 duplicateCount += 1;
                 continue;
             }
 
             seenCases.add(key);
-            regressionCases.push(row);
+            parserCases.push(row);
         }
     }
 
-    await writeRegressionCaseCsv(outputFilePath, regressionCases);
+    await writeParserCaseFile(outputFilePath, parserCases);
     return {
-        caseCount: regressionCases.length,
+        caseCount: parserCases.length,
         dumpFileCount: fileNames.length,
         duplicateCount,
     };
@@ -69,7 +69,7 @@ export async function materializeCaseDumps({
 async function main() {
     const {caseCount, dumpFileCount, duplicateCount} = await materializeCaseDumps();
     console.log(
-        `Wrote ${caseCount} regression case(s) from ${dumpFileCount} case dump file(s) to ${path.relative(repositoryRoot, outputPath)}; skipped ${duplicateCount} duplicate(s).`,
+        `Wrote ${caseCount} parser case(s) from ${dumpFileCount} case dump file(s) to ${path.relative(repositoryRoot, outputPath)}; skipped ${duplicateCount} duplicate(s).`,
     );
 }
 

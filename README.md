@@ -5,9 +5,9 @@ generator. Its main job is to turn real corpus tokens and manually or
 LLM-discovered inconsistencies into regression cases that expose missing
 headwords and candidate-order problems.
 
-Regression cases test which generated candidate resolves first against the
-current CKD headword set. An extra candidate is a failure when it is a
-headword and resolves before the expected result.
+Regression cases record the complete sequence of generated candidates that
+resolve against the current CKD headword set. Tests preserve candidate order
+and continue collecting hits after the first one.
 
 ## Requirements
 
@@ -63,10 +63,9 @@ The generated review CSVs use exactly these columns:
 `token,occurrences,expected_result,is_interesting`
 
 Blank generated review batches stay in `data/review/batches/`. Human or
-LLM review happens in copies with descriptive filenames under
-`data/case-dumps/`, such as `initial_prompt.csv`, `manual_2026-07-06.csv`, or
-`corpus_review_0-10k.csv`. A dump only needs the `token` and `expected_result`
-columns, so review-only columns can be removed or left in place.
+LLM review results are transcribed into descriptively named text files under
+`data/case-dumps/`, such as `initial_prompt.txt`, `manual_2026-07-06.txt`, or
+`corpus_review_0-10k.txt`.
 
 After labeling, run:
 
@@ -74,10 +73,10 @@ After labeling, run:
 npm test
 ```
 
-Before running the tests, that command reads every CSV file in
+Before running the tests, that command reads every text file in
 `data/case-dumps/` and generates:
 
-`data/cases/_combined.csv`
+`data/cases/_combined.txt`
 
 The original 10k review batches remain unchanged as reusable review input.
 
@@ -88,24 +87,27 @@ file under:
 
 `data/case-dumps/`
 
-Each CSV requires these columns, in either order:
+Each non-empty line is one case:
 
-`token,expected_result`
+`token, hit1, hit2, ...`
 
-Optional columns such as `enabled`, `notes`, `occurrences`, or
-`is_interesting` are allowed. Unknown columns are ignored. Rows are included
-by default; set `enabled` to `false`, `no`, `n`, `off`, `0`, or `disabled` to
-skip one. Empty rows and rows missing either required value are ignored.
+There is no header. The first word is the input token, which must also be the
+first generated candidate. Every word after it is a generated candidate that
+exists in the current CKD headword set, in exact traversal order. Generated
+candidates that miss the headword set are omitted, and collection continues
+after every hit. A line containing only the token asserts that no generated
+candidate resolves. If the token is itself a headword, it appears again as the
+first hit.
 
-`npm test` scans all `data/case-dumps/*.csv`, deduplicates identical
-`token`/`expected_result` pairs, and writes the generated regression suite to
-`data/cases/_combined.csv` before running the tests.
+For example:
 
-For each case, `expected_result` is the first generated candidate that resolves
-against the current CKD headword set. A case fails if no candidate resolves or
-if a different candidate resolves first. If the token itself is already a
-headword and `expected_result` equals the token, the test warns that the case is
-probably redundant but does not fail for that reason.
+`dirikan, mendirikan, diri`
+
+`npm test` scans all `data/case-dumps/*.txt`, deduplicates identical cases, and
+writes the generated regression suite to `data/cases/_combined.txt` before
+running the tests. A case fails if the actual ordered hit sequence differs in
+any position, has a missing hit, or has an extra hit. A case whose only hit is
+the token itself produces a redundancy warning, not a failure.
 
 ## Repository layout
 
@@ -115,7 +117,7 @@ probably redundant but does not fail for that reason.
   transformation order, and first-occurrence candidate deduplication.
 - `src/headword-index.js`: exact headword set with source provenance.
 - `src/report-generator.js`: resolves tokens against the candidate sequence.
-- `src/case-files.js`: CSV loaders and writers for regression-case files.
+- `src/case-files.js`: ordered parser-case text and review CSV file helpers.
 - `data/headwords/sources/`: raw headword lists.
 - `data/review/`: generated review queues and 10k review-input batches.
 - `data/case-dumps/`: source-specific accepted case dumps.

@@ -4,14 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
-    loadCaseDumpCsv,
-    loadRegressionCaseCsv,
+    loadParserCaseFile,
     loadReviewBatchCsv,
 } from '../src/case-files.js';
 
-async function withTemporaryCsv(contents, callback) {
+async function withTemporaryFile(contents, callback, extension = '.txt') {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'cari-kata-dasar-'));
-    const filePath = path.join(directory, 'cases.csv');
+    const filePath = path.join(directory, `cases${extension}`);
     try {
         await writeFile(filePath, contents, 'utf8');
         await callback(filePath);
@@ -20,73 +19,47 @@ async function withTemporaryCsv(contents, callback) {
     }
 }
 
-test('header-only regression case CSV produces zero cases', async () => {
-    await withTemporaryCsv('token,expected_result\n', async (filePath) => {
-        assert.deepEqual(await loadRegressionCaseCsv(filePath), []);
+test('empty parser case text produces zero cases', async () => {
+    await withTemporaryFile('\n', async (filePath) => {
+        assert.deepEqual(await loadParserCaseFile(filePath), []);
+    });
+});
+
+test('parser case text preserves the ordered hit sequence', async () => {
+    await withTemporaryFile(
+        'dirikan, mendirikan, diri\r\n'
+            + 'tanpa-hit\n'
+            + '\n',
+        async (filePath) => {
+            assert.deepEqual(await loadParserCaseFile(filePath), [
+                {token: 'dirikan', hits: ['mendirikan', 'diri']},
+                {token: 'tanpa-hit', hits: []},
+            ]);
+        },
+    );
+});
+
+test('parser case text rejects empty entries', async () => {
+    await withTemporaryFile('dirikan, , diri\n', async (filePath) => {
+        await assert.rejects(
+            loadParserCaseFile(filePath),
+            /parser case entries must be non-empty/u,
+        );
     });
 });
 
 test('header-only review batch CSV produces zero cases', async () => {
-    await withTemporaryCsv(
+    await withTemporaryFile(
         'token,occurrences,expected_result,is_interesting\n',
         async (filePath) => {
             assert.deepEqual(await loadReviewBatchCsv(filePath), []);
         },
+        '.csv',
     );
-});
-
-test('regression case CSV requires exact column order', async () => {
-    await withTemporaryCsv('expected_result,token\n', async (filePath) => {
-        await assert.rejects(
-            loadRegressionCaseCsv(filePath),
-            /expected token,expected_result/u,
-        );
-    });
-});
-
-test('case dump CSV requires token and expected_result in any column order', async () => {
-    await withTemporaryCsv(
-        'notes,expected_result,token,enabled,unknown\n'
-            + 'keep,makan,makanan,,ignored\n'
-            + 'keep,tulis,tulisan,yes,ignored\n',
-        async (filePath) => {
-            assert.deepEqual(await loadCaseDumpCsv(filePath), [
-                {token: 'makanan', expected_result: 'makan'},
-                {token: 'tulisan', expected_result: 'tulis'},
-            ]);
-        },
-    );
-});
-
-test('case dump CSV ignores empty, incomplete, and disabled rows', async () => {
-    await withTemporaryCsv(
-        'token,expected_result,enabled,notes\n'
-            + '\n'
-            + ',,,\n'
-            + 'berkata,,true,\n'
-            + ',kata,true,\n'
-            + 'abaikan,abai,false,\n'
-            + 'abaikan-juga,abai, OFF ,\n'
-            + 'kiriman,kirim\n',
-        async (filePath) => {
-            assert.deepEqual(await loadCaseDumpCsv(filePath), [
-                {token: 'kiriman', expected_result: 'kirim'},
-            ]);
-        },
-    );
-});
-
-test('case dump CSV rejects a missing required column', async () => {
-    await withTemporaryCsv('token,notes\nkata,missing expected result\n', async (filePath) => {
-        await assert.rejects(
-            loadCaseDumpCsv(filePath),
-            /exactly one expected_result column/u,
-        );
-    });
 });
 
 test('review batch CSV requires exact column order', async () => {
-    await withTemporaryCsv(
+    await withTemporaryFile(
         'token,expected_result,occurrences,is_interesting\n',
         async (filePath) => {
             await assert.rejects(
@@ -94,5 +67,6 @@ test('review batch CSV requires exact column order', async () => {
                 /expected token,occurrences,expected_result,is_interesting/u,
             );
         },
+        '.csv',
     );
 });

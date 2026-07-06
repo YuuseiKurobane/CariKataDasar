@@ -1,24 +1,25 @@
 # Case dumps
 
-Keep small, source-specific CSV files here, for example:
+Keep small, source-specific text files here, for example:
 
-- `initial_prompt.csv`
-- `manual_2026-07-06.csv`
-- `corpus_review_0-10k.csv`
+- `initial_prompt.txt`
+- `manual_2026-07-06.txt`
+- `corpus_review_0-10k.txt`
 
-Every CSV requires `token` and `expected_result` columns. Their order does not
-matter. Other columns, such as `notes`, are allowed and ignored by the
-materializer.
+Each non-empty line has this format, with no header:
 
-Rows are enabled by default. Set an optional `enabled` value to `false`, `no`,
-`n`, `off`, `0`, or `disabled` (case-insensitive) to skip a row. Empty rows
-and rows without both required values are also skipped.
+`token, hit1, hit2, ...`
 
-Run `npm test` to merge the enabled rows into `data/cases/_combined.csv` before
-the tests run. Duplicate `token`/`expected_result` pairs are written only once.
+The first word is the input token and must be the first candidate tried. The
+remaining words are every generated candidate found in the current CKD
+headword set, in traversal order. Omit generated candidates that do not hit,
+but continue recording hits after the first one. A token-only line asserts
+that there are no hits. If the token is itself a headword, repeat it immediately
+after the token as the first hit.
 
-`expected_result` must be the first generated candidate that resolves against
-the current CKD headword set. The case fails if no candidate resolves or if a
-different candidate resolves first. A case where the token is already a
-headword and `expected_result` equals the token produces a redundancy warning,
-not a failure.
+Run `npm test` to merge all `*.txt` dumps into
+`data/cases/_combined.txt` before the tests run. Identical cases are written
+only once. The test fails on any missing, extra, or out-of-order hit.
+
+If a case's only hit is the token itself, the test emits a redundancy warning
+without failing for that reason.
