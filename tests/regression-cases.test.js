@@ -10,8 +10,8 @@ const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url))
 const combinedCaseFilePath = path.join(
     repositoryRoot,
     'data',
-    'cases',
-    '_combined.txt',
+    'testcases-results',
+    '_combined_testcases.txt',
 );
 const headwordSourceDirectory = path.join(
     repositoryRoot,
@@ -24,11 +24,12 @@ const [parserCases, headwordIndex] = await Promise.all([
     loadHeadwordIndex(headwordSourceDirectory),
 ]);
 
-for (const {token, hits: expectedHits} of parserCases) {
-    test(`regression case ${token} follows its ordered hit sequence`, () => {
+for (const {token, prefixHits, fuzzyTailHits} of parserCases) {
+    test(`regression case ${token} follows its strict prefix and fuzzy tail`, () => {
         if (
-            expectedHits.length === 1
-            && expectedHits[0] === token
+            prefixHits.length === 1
+            && fuzzyTailHits.length === 0
+            && prefixHits[0] === token
             && headwordIndex.headwords.has(token)
         ) {
             console.warn(
@@ -47,9 +48,19 @@ for (const {token, hits: expectedHits} of parserCases) {
             .filter(({text}) => headwordIndex.headwords.has(text))
             .map(({text}) => text);
         assert.deepEqual(
-            actualHits,
-            expectedHits,
-            `${token} resolved a different ordered hit sequence`,
+            actualHits.slice(0, prefixHits.length),
+            prefixHits,
+            `${token} resolved a different strict hit prefix`,
+        );
+
+        const tailHits = actualHits.slice(prefixHits.length);
+        const missingFuzzyTailHits = fuzzyTailHits.filter(
+            (expectedHit) => !tailHits.includes(expectedHit),
+        );
+        assert.deepEqual(
+            missingFuzzyTailHits,
+            [],
+            `${token} did not resolve every fuzzy tail hit`,
         );
     });
 }

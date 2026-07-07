@@ -125,6 +125,91 @@ async function loadCsvObjects(filePath, expectedHeader) {
     return rowsToObjects(bodyRows, expectedHeader, filePath);
 }
 
+function syntaxError(filePath, lineNumber, message) {
+    throw new Error(`${filePath}:${lineNumber}: Syntax Error: ${message}`);
+}
+
+function splitParserCaseLine(line, filePath, lineNumber) {
+    const entries = [];
+    let entry = '';
+    let depth = 0;
+
+    for (const character of line) {
+        if (character === '(') {
+            if (depth !== 0) {
+                syntaxError(filePath, lineNumber, 'nested fuzzy tail brackets are not supported');
+            }
+            depth = 1;
+            entry += character;
+            continue;
+        }
+
+        if (character === ')') {
+            if (depth !== 1) {
+                syntaxError(filePath, lineNumber, 'unmatched fuzzy tail bracket');
+            }
+            depth = 0;
+            entry += character;
+            continue;
+        }
+
+        if (character === ',' && depth === 0) {
+            entries.push(entry.trim());
+            entry = '';
+            continue;
+        }
+
+        entry += character;
+    }
+
+    if (depth !== 0) {
+        syntaxError(filePath, lineNumber, 'unterminated fuzzy tail bracket');
+    }
+
+    entries.push(entry.trim());
+    return entries;
+}
+
+function parseFuzzyTail(entry, filePath, lineNumber) {
+    const inner = entry.slice(1, -1).trim();
+    if (inner.length === 0) {
+        syntaxError(filePath, lineNumber, 'fuzzy tail must contain at least one entry');
+    }
+
+    const fuzzyTailHits = inner.split(',').map((word) => word.trim());
+    if (fuzzyTailHits.some((word) => word.length === 0)) {
+        syntaxError(filePath, lineNumber, 'fuzzy tail entries must be non-empty');
+    }
+    if (fuzzyTailHits.some((word) => /[()]/u.test(word))) {
+        syntaxError(filePath, lineNumber, 'nested fuzzy tail brackets are not supported');
+    }
+
+    return fuzzyTailHits;
+}
+
+function parseParserCaseLine(line, filePath, lineNumber) {
+    const entries = splitParserCaseLine(line, filePath, lineNumber);
+    if (entries.some((word) => word.length === 0)) {
+        throw new Error(
+            `${filePath}:${lineNumber}: parser case entries must be non-empty`,
+        );
+    }
+
+    const lastEntry = entries.at(-1);
+    const hasFuzzyTail = /^\([^()]*\)$/u.test(lastEntry);
+    const fuzzyTailHits = hasFuzzyTail
+        ? parseFuzzyTail(lastEntry, filePath, lineNumber)
+        : [];
+    const strictEntries = hasFuzzyTail ? entries.slice(0, -1) : entries;
+
+    if (strictEntries.some((word) => /[()]/u.test(word))) {
+        syntaxError(filePath, lineNumber, 'fuzzy tail brackets are only allowed at the end');
+    }
+
+    const [token, ...prefixHits] = strictEntries;
+    return {token, prefixHits, fuzzyTailHits};
+}
+
 export async function loadParserCaseFile(filePath) {
     const contents = await readFile(filePath, 'utf8');
     const records = [];
@@ -135,15 +220,7 @@ export async function loadParserCaseFile(filePath) {
             continue;
         }
 
-        const words = line.split(',').map((word) => word.trim());
-        if (words.some((word) => word.length === 0)) {
-            throw new Error(
-                `${filePath}:${index + 1}: parser case entries must be non-empty`,
-            );
-        }
-
-        const [token, ...hits] = words;
-        records.push({token, hits});
+        records.push(parseParserCaseLine(line, filePath, index + 1));
     }
 
     return records;
@@ -168,7 +245,13 @@ export async function loadReviewBatchCsv(filePath) {
 }
 
 export async function writeParserCaseFile(filePath, records) {
-    const lines = records.map(({token, hits}) => [token, ...hits].join(', '));
+    const lines = records.map(({token, prefixHits, fuzzyTailHits = []}) => {
+        const entries = [token, ...prefixHits];
+        if (fuzzyTailHits.length > 0) {
+            entries.push(`(${fuzzyTailHits.join(', ')})`);
+        }
+        return entries.join(', ');
+    });
     const contents = lines.length === 0 ? '' : `${lines.join('\n')}\n`;
     await writeTextAtomic(filePath, contents);
 }

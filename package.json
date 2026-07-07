@@ -10,8 +10,9 @@
   "scripts": {
     "build:headwords": "node scripts/build-headwords.mjs",
     "check:upstream": "node scripts/check-upstream.mjs",
+    "debug:traces": "node scripts/write-debug-traces.mjs",
     "prepare:frequencies": "py scripts/prepare-debug-frequencies.py && node scripts/prepare-review-cases.mjs",
-    "pretest": "node scripts/materialize-case-dumps.mjs",
+    "pretest": "node scripts/materialize-testcases.mjs",
     "test": "node --test"
   },
   "license": "GPL-3.0-or-later"

@@ -25,15 +25,23 @@ test('empty parser case text produces zero cases', async () => {
     });
 });
 
-test('parser case text preserves the ordered hit sequence', async () => {
+test('parser case text preserves the strict prefix and fuzzy tail', async () => {
     await withTemporaryFile(
         'dirikan, mendirikan, diri\r\n'
-            + 'tanpa-hit\n'
+            + 'diberikan, diberikan, memberikan, (berikan, diberi, beri)\n'
             + '\n',
         async (filePath) => {
             assert.deepEqual(await loadParserCaseFile(filePath), [
-                {token: 'dirikan', hits: ['mendirikan', 'diri']},
-                {token: 'tanpa-hit', hits: []},
+                {
+                    token: 'dirikan',
+                    prefixHits: ['mendirikan', 'diri'],
+                    fuzzyTailHits: [],
+                },
+                {
+                    token: 'diberikan',
+                    prefixHits: ['diberikan', 'memberikan'],
+                    fuzzyTailHits: ['berikan', 'diberi', 'beri'],
+                },
             ]);
         },
     );
@@ -44,6 +52,24 @@ test('parser case text rejects empty entries', async () => {
         await assert.rejects(
             loadParserCaseFile(filePath),
             /parser case entries must be non-empty/u,
+        );
+    });
+});
+
+test('parser case text rejects fuzzy brackets before the tail', async () => {
+    await withTemporaryFile('dirikan, (dir), rik\n', async (filePath) => {
+        await assert.rejects(
+            loadParserCaseFile(filePath),
+            /Syntax Error: fuzzy tail brackets are only allowed at the end/u,
+        );
+    });
+});
+
+test('parser case text rejects malformed fuzzy tails', async () => {
+    await withTemporaryFile('dirikan, dirikan, ()\n', async (filePath) => {
+        await assert.rejects(
+            loadParserCaseFile(filePath),
+            /Syntax Error: fuzzy tail must contain at least one entry/u,
         );
     });
 });

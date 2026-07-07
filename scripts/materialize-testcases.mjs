@@ -7,20 +7,20 @@ import {
 } from '../src/case-files.js';
 
 const repositoryRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const caseDumpDirectory = path.join(repositoryRoot, 'data', 'case-dumps');
-const outputPath = path.join(repositoryRoot, 'data', 'cases', '_combined.txt');
+const testcaseDumpDirectory = path.join(repositoryRoot, 'data', 'testcases-dump');
+const outputPath = path.join(repositoryRoot, 'data', 'testcases-results', '_combined_testcases.txt');
 
-function isCaseDumpFile(name) {
+function isTestcaseDumpFile(name) {
     return /\.txt$/iu.test(name);
 }
 
-async function getCaseDumpFiles(directoryPath) {
+async function getTestcaseDumpFiles(directoryPath) {
     try {
         const entries = await readdir(directoryPath, {withFileTypes: true});
         return entries
             .filter((entry) => entry.isFile())
             .map((entry) => entry.name)
-            .filter(isCaseDumpFile)
+            .filter(isTestcaseDumpFile)
             .sort();
     } catch (error) {
         if (error?.code === 'ENOENT') {
@@ -30,24 +30,28 @@ async function getCaseDumpFiles(directoryPath) {
     }
 }
 
-export async function materializeCaseDumps({
-    caseDumpDirectoryPath = caseDumpDirectory,
+export async function materializeTestcases({
+    testcaseDumpDirectoryPath = testcaseDumpDirectory,
     outputFilePath = outputPath,
 } = {}) {
-    await mkdir(caseDumpDirectoryPath, {recursive: true});
+    await mkdir(testcaseDumpDirectoryPath, {recursive: true});
     await mkdir(path.dirname(outputFilePath), {recursive: true});
 
-    const fileNames = await getCaseDumpFiles(caseDumpDirectoryPath);
+    const fileNames = await getTestcaseDumpFiles(testcaseDumpDirectoryPath);
     const parserCases = [];
     const seenCases = new Set();
     let duplicateCount = 0;
 
     for (const fileName of fileNames) {
         const rows = await loadParserCaseFile(
-            path.join(caseDumpDirectoryPath, fileName),
+            path.join(testcaseDumpDirectoryPath, fileName),
         );
         for (const row of rows) {
-            const key = JSON.stringify([row.token, ...row.hits]);
+            const key = JSON.stringify([
+                row.token,
+                row.prefixHits,
+                row.fuzzyTailHits,
+            ]);
             if (seenCases.has(key)) {
                 duplicateCount += 1;
                 continue;
@@ -67,9 +71,9 @@ export async function materializeCaseDumps({
 }
 
 async function main() {
-    const {caseCount, dumpFileCount, duplicateCount} = await materializeCaseDumps();
+    const {caseCount, dumpFileCount, duplicateCount} = await materializeTestcases();
     console.log(
-        `Wrote ${caseCount} parser case(s) from ${dumpFileCount} case dump file(s) to ${path.relative(repositoryRoot, outputPath)}; skipped ${duplicateCount} duplicate(s).`,
+        `Wrote ${caseCount} parser testcase(s) from ${dumpFileCount} testcase file(s) to ${path.relative(repositoryRoot, outputPath)}; skipped ${duplicateCount} duplicate(s).`,
     );
 }
 
